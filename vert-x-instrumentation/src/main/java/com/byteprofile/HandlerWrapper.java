@@ -1,28 +1,24 @@
 package com.byteprofile;
 
-//import io.vertx.core.Context;
-
 import io.vertx.core.Handler;
+import io.vertx.ext.web.RoutingContext;
 
-public class HandlerWrapper<T> implements Handler<T> {
-    private final Handler<T> delegate;
-//    private final Context context;
+/**
+ * This is used to wrap Vert.x Handlers to provide nice user-friendly SERVER span names
+ */
+public final class HandlerWrapper implements Handler<RoutingContext> {
 
-    private HandlerWrapper(Handler<T> delegate) {
-        this.delegate = delegate;
-        System.out.println("Hello !");
-        //  this.context = context;
-    }
+    private final Handler<RoutingContext> handler;
 
-    public static <T> Handler<T> wrap(Handler<T> handler) {
-        //     Context current = Context.current();
-        handler = new HandlerWrapper<>(handler);
-        return handler;
+    public HandlerWrapper(Handler<RoutingContext> handler) {
+        System.out.println("ENTER IN HandlerWrapper");
+        this.handler = handler;
     }
 
     @Override
-    public void handle(T t) {
+    public void handle(RoutingContext context) {
 
-        delegate.handle(t);
+        handler.handle(context);
+
     }
 }

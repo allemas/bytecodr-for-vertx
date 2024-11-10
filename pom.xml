@@ -12,6 +12,7 @@
     <modules>
         <module>agent-core</module>
         <module>vert-x-instrumentation</module>
+        <module>bootstrap-bytebuddy</module>
     </modules>
 
     <properties>

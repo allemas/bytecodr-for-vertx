@@ -10,14 +10,13 @@
     </parent>
 
     <groupId>com.byteprofile</groupId>
-    <artifactId>agent-core</artifactId>
+    <artifactId>bootstrap-bytebuddy</artifactId>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
-
     <dependencies>
         <dependency>
             <groupId>net.bytebuddy</groupId>
@@ -28,7 +27,6 @@
 
     <build>
         <plugins>
-
             <!-- Plugin pour créer le JAR avec dépendances -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -42,17 +40,8 @@
                         </goals>
                         <configuration>
                             <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <manifestEntries>
-                                        <Premain-Class>com.byteprofile.Premain</Premain-Class>
-                                        <Agent-Class>com.byteprofile.Premain</Agent-Class>
-                                        <Can-Redefine-Classes>true</Can-Redefine-Classes>
-                                        <Can-Retransform-Classes>true</Can-Retransform-Classes>
-                                    </manifestEntries>
-                                </transformer>
                             </transformers>
-                            <finalName>${finalName}-shade</finalName>
-
+                            <finalName>bytebuddy-shaded</finalName>
                         </configuration>
                     </execution>
                 </executions>

@@ -25,23 +25,17 @@
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy</artifactId>
-            <version>1.15.4</version>
+            <version>1.15.10</version>
         </dependency>
-
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-web</artifactId>
-            <version>3.0.0</version>
+            <version>4.5.10</version>
         </dependency>
         <dependency>
             <groupId>io.vertx</groupId>
-            <artifactId>vertx-jdbc-client</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-codegen</artifactId>
-            <version>3.0.0</version>
+            <artifactId>vertx-core</artifactId>
+            <version>4.5.10</version>
         </dependency>
     </dependencies>
     <build>
@@ -58,9 +52,15 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <createDependencyReducedPom>true</createDependencyReducedPom>
-                            <finalName>vertx-instr</finalName>
-
+                            <transformers>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <manifestEntries>
+                                        <Main-Class>com.byteprofile.Main</Main-Class>
+                                    </manifestEntries>
+                                </transformer>
+                            </transformers>
+                            <finalName>vertx-instr-shaded</finalName>
                         </configuration>
                     </execution>
                 </executions>
@@ -68,7 +68,5 @@
 
         </plugins>
     </build>
-
-
 
 </project>

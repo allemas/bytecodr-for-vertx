@@ -12,22 +12,16 @@ import java.util.ArrayList;
 public class HandlerVisitorCallSite {
     @Advice.OnMethodEnter
     public static void onEnter(
-            @Advice.Argument(value = 0, readOnly = false, typing = Assigner.Typing.DYNAMIC) Handler<?> handler
+            @Advice.Argument(value = 0, readOnly = false) Handler<RoutingContext> handler
     ) {
-        System.out.print("ENTER the method: " + '\n');
-
+        System.out.println("ENTER the method: ");
         try {
-            ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            Class tt = cl.loadClass("io.vertx.core.Handler");
-            System.out.print(" class is available " + tt.getName());
-            handler = HandlerWrapper.wrap(handler);
-
+            System.out.println("-->" + handler.getClass().getClassLoader());
+            handler = new HandlerWrapper(handler);
         } catch (Exception e) {
+            System.out.println(e.getMessage());
             throw new RuntimeException(e);
         }
-
-
-
     }
 
     @Advice.OnMethodExit

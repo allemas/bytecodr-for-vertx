@@ -26,12 +26,12 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 
 public class Premain {
 
-    public static void premain(String agentArgs, Instrumentation inst) throws URISyntaxException, IOException, InterruptedException {
+    public  static void premain(String agentArgs, Instrumentation inst) throws URISyntaxException, IOException, InterruptedException {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         injectBootstrapClasses(inst, classLoader);
     }
 
-    private synchronized static void injectBootstrapClasses(Instrumentation instrumentation, ClassLoader classLoadert) throws IOException {
+    private  static void injectBootstrapClasses(Instrumentation instrumentation, ClassLoader classLoadert) throws IOException {
         ClassLoader classLoader = ClassLoader.getSystemClassLoader();
         ClassLoader parent = ClassLoader.getSystemClassLoader().getParent();
 
@@ -53,13 +53,31 @@ public class Premain {
         //JarFile currentAgentJar = new JarFile(javaagentFile, false);
 
         JarFile currentAgentJar = new JarFile(javaagentFile, false);
+        instrumentation.appendToBootstrapClassLoaderSearch(currentAgentJar);
 
-        String agentPathVertx = "/<path>/vertx-instr.jar";
+        String agentPathVertx = "/Users/sebastienallemand/Documents/bytecodr-for-vertx/vert-x-instrumentation/target/vertx-instr-shaded.jar";
         File javaagentFileVertx = new File(agentPathVertx);
         JarFile agentJarvertx = new JarFile(javaagentFileVertx, false);
+     // instrumentation.appendToBootstrapClassLoaderSearch(agentJarvertx);
+
+        String agentPathVertx2 = "/Users/sebastienallemand/Documents/bytecodr-for-vertx/vert-x-instrumentation/target/vert-x-instrumentation-1.0-SNAPSHOT.jar";
+        File javaagentFileVertx2 = new File(agentPathVertx2);
+        JarFile agentJarvertx2 = new JarFile(javaagentFileVertx2, false);
+       instrumentation.appendToBootstrapClassLoaderSearch(agentJarvertx2);
+
+        String agentPathbbuddy = "/Users/sebastienallemand/Documents/bytecodr-for-vertx/bootstrap-bytebuddy/target/bytebuddy-shaded.jar";
+        File javaagentFilebbudy = new File(agentPathbbuddy);
+        JarFile javaagentjar = new JarFile(javaagentFilebbudy, false);
+  //      instrumentation.appendToBootstrapClassLoaderSearch(javaagentjar);
 
 
-        BytecodrClassLoader classLoader1 = new BytecodrClassLoader(new URL[]{javaagentFileVertx.toURL()}, classLoader);
+        BytecodrClassLoader classLoader1 = new BytecodrClassLoader(new URL[]{
+                javaagentFileVertx.toURL(),
+                javaagentFileVertx2.toURL(),
+                javaagentFilebbudy.toURL(),
+        }, parent);
+
+
 
 
         try {
@@ -99,3 +117,4 @@ public class Premain {
 
 
 }
+

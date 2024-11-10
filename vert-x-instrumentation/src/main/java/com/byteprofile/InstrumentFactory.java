@@ -9,16 +9,18 @@ import net.bytebuddy.asm.Advice;
 import net.bytebuddy.asm.MemberSubstitution;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.DynamicType;
+import net.bytebuddy.dynamic.TypeResolutionStrategy;
 import net.bytebuddy.dynamic.VisibilityBridgeStrategy;
-import net.bytebuddy.dynamic.loading.ByteArrayClassLoader;
-import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
-import net.bytebuddy.dynamic.loading.ClassLoadingStrategy.ForUnsafeInjection;
+import net.bytebuddy.dynamic.loading.*;
 import net.bytebuddy.dynamic.scaffold.InstrumentedType;
 import net.bytebuddy.dynamic.scaffold.MethodGraph;
+import net.bytebuddy.implementation.auxiliary.AuxiliaryType;
+import net.bytebuddy.implementation.bytecode.assign.Assigner;
 import net.bytebuddy.matcher.ElementMatchers;
 import net.bytebuddy.matcher.StringMatcher;
 import net.bytebuddy.utility.JavaModule;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.instrument.Instrumentation;
@@ -29,15 +31,16 @@ import java.util.Map;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
+
 import static net.bytebuddy.agent.builder.AgentBuilder.RedefinitionStrategy.REDEFINITION;
 import static net.bytebuddy.agent.builder.AgentBuilder.RedefinitionStrategy.RETRANSFORMATION;
-import static net.bytebuddy.dynamic.loading.ClassLoadingStrategy.*;
-import static net.bytebuddy.dynamic.loading.ClassLoadingStrategy.Default.INJECTION;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
 public class InstrumentFactory {
 
     public InstrumentFactory(ClassLoader c, ClassLoader parent, Instrumentation loadedInstrumentation) throws IOException, NoSuchMethodException {
+
         new AgentBuilder
                 .Default()
                 .with(
@@ -60,20 +63,22 @@ public class InstrumentFactory {
                 )
 
                 .disableClassFormatChanges()
-                .with(AgentBuilder.TypeStrategy.Default.DECORATE)
                 .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
-                .with(new RedefinitionDiscoveryStrategy())
+//                .with(new RedefinitionDiscoveryStrategy())
                 .with(AgentBuilder.DescriptionStrategy.Default.POOL_ONLY)
                 .with(AgentBuilder.InjectionStrategy.UsingUnsafe.INSTANCE)
 
                 .type(named("io.vertx.ext.web.impl.RouteImpl"))
                 .transform(new AgentBuilder.Transformer.ForAdvice()
                         .include(c)
-                        .advice(ElementMatchers.named("handler"), HandlerVisitorCallSite.class.getName())
-
+                        .advice(ElementMatchers.named("handler")
+                                .and(takesArgument(0, named("io.vertx.core.Handler")
+                                )), "com.byteprofile.instrumentation.HandlerVisitorCallSite")
+                        .auxiliary(List.of("com.byteprofile.HandlerWrapper","io.vertx.core.Handler", "com.byteprofile.instrumentation.HandlerVisitorCallSite"))
 
                 )
                 .installOn(loadedInstrumentation);
+
 
     }
 
@@ -120,7 +125,7 @@ public class InstrumentFactory {
             ClassLoader cl = c.getClassLoader();
             if (cl instanceof ByteArrayClassLoader) {
                 System.out.println(c.getName());
-                System.out.println("---");
+                System.out.println("xxxx");
                 return true;
             }
             // ignore generate byte buddy helper class

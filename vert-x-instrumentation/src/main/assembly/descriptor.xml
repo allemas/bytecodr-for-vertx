@@ -1,0 +1,26 @@
+<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.3"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.3
+                              http://maven.apache.org/xsd/assembly-1.1.3.xsd">
+    <id>jar-without-dependencies</id>
+    <baseDirectory></baseDirectory>
+    <formats>
+        <format>jar</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+
+    <!-- Inclure uniquement les classes du projet sans dépendances -->
+    <files>
+        <fileSet>
+            <directory>${project.build.outputDirectory}</directory>
+            <includes>
+                <include>**/*.class</include>
+            </includes>
+        </fileSet>
+    </files>
+
+    <!-- Ajouter le fichier MANIFEST -->
+    <manifest>
+        <mainClass>com.byteprofile.Main</mainClass>
+    </manifest>
+</assembly>

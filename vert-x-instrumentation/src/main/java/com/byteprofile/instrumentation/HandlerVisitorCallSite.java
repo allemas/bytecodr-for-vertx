@@ -1,23 +1,40 @@
 package com.byteprofile.instrumentation;
 
 import com.byteprofile.HandlerWrapper;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.exporter.logging.LoggingSpanExporter;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.vertx.core.Handler;
+import io.vertx.core.http.HttpServerRequest;
 import io.vertx.ext.web.RoutingContext;
 import net.bytebuddy.asm.Advice;
 import net.bytebuddy.implementation.bytecode.assign.Assigner;
 
+import javax.imageio.spi.ServiceRegistry;
 import java.util.ArrayList;
 
 
 public class HandlerVisitorCallSite {
     @Advice.OnMethodEnter
     public static void onEnter(
-            @Advice.Argument(value = 0, readOnly = false) Handler<RoutingContext> handler
+            @Advice.Argument(value = 0, readOnly = false) Handler<HttpServerRequest> handler
     ) {
+
+        SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+                .addSpanProcessor(SimpleSpanProcessor.create(LoggingSpanExporter.create()))
+                .build();
+
+        OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+                .setTracerProvider(tracerProvider)
+                .buildAndRegisterGlobal();
+
+
+
         System.out.println("ENTER the method: ");
         try {
-            System.out.println("-->" + handler.getClass().getClassLoader());
-            handler = new HandlerWrapper(handler);
+            handler = HandlerWrapper.wrap(handler);
         } catch (Exception e) {
             System.out.println(e.getMessage());
             throw new RuntimeException(e);

@@ -10,10 +10,7 @@ public class LogAllCallsites {
             @Advice.Origin("#t #m") String detaildOrigin
     ) {
         System.out.print("ENTER method: " + detaildOrigin);
-
         System.out.print(detaildOrigin);
-        System.out.print(" ");
-        System.out.print('\n');
     }
 
     @Advice.OnMethodExit

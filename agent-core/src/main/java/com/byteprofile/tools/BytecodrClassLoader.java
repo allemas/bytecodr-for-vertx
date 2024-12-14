@@ -1,4 +1,4 @@
-package com.byteprofile;
+package com.byteprofile.tools;
 
 
 import java.net.URL;

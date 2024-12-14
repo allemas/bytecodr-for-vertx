@@ -40,45 +40,32 @@ import static net.bytebuddy.matcher.ElementMatchers.*;
 public class InstrumentFactory {
 
     public InstrumentFactory(ClassLoader c, ClassLoader parent, Instrumentation loadedInstrumentation) throws IOException, NoSuchMethodException {
+        System.out.println("Start inst");
 
         new AgentBuilder
                 .Default()
-                .with(
-                        new AgentBuilder.Listener.Filtering(
-                                new StringMatcher("com.byteprofile", StringMatcher.Mode.CONTAINS),
-                                AgentBuilder.Listener.StreamWriting.toSystemOut())
-                )
-                .with(
-                        new AgentBuilder.Listener.Filtering(
-                                new StringMatcher("io.vertx.core.Handler", StringMatcher.Mode.CONTAINS),
-                                AgentBuilder.Listener.StreamWriting.toSystemOut())
 
-                )
-
-                .with(
-                        new AgentBuilder.Listener.Filtering(
-                                new StringMatcher("io.vertx.ext.web.impl.RouteImpl", StringMatcher.Mode.CONTAINS),
-                                AgentBuilder.Listener.StreamWriting.toSystemOut())
-
-                )
+                .with(AgentBuilder.InstallationListener.StreamWriting.toSystemError())  // Logs d'installation d'agent
+                .ignore(none())  // Ne pas ignorer de classes (cible toutes les classes)
+                .with(AgentBuilder.Listener.StreamWriting.toSystemError().withTransformationsOnly())
 
                 .disableClassFormatChanges()
                 .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
-//                .with(new RedefinitionDiscoveryStrategy())
                 .with(AgentBuilder.DescriptionStrategy.Default.POOL_ONLY)
                 .with(AgentBuilder.InjectionStrategy.UsingUnsafe.INSTANCE)
-
-                .type(named("io.vertx.ext.web.impl.RouteImpl"))
+                .type(named("io.vertx.core.http.impl.HttpServerImpl"))
                 .transform(new AgentBuilder.Transformer.ForAdvice()
                         .include(c)
-                        .advice(ElementMatchers.named("handler")
+                        .advice(ElementMatchers.named("requestHandler")
                                 .and(takesArgument(0, named("io.vertx.core.Handler")
-                                )), "com.byteprofile.instrumentation.HandlerVisitorCallSite")
-                        .auxiliary(List.of("com.byteprofile.HandlerWrapper","io.vertx.core.Handler", "com.byteprofile.instrumentation.HandlerVisitorCallSite"))
+                                        )
+                                ), "com.byteprofile.instrumentation.HandlerVisitorCallSite")
+                        .auxiliary(List.of("com.byteprofile.HandlerWrapper"))
 
                 )
                 .installOn(loadedInstrumentation);
 
+        System.out.println("FINISH inst");
 
     }
 
@@ -124,8 +111,6 @@ public class InstrumentFactory {
         private static boolean isIgnored(Class<?> c) {
             ClassLoader cl = c.getClassLoader();
             if (cl instanceof ByteArrayClassLoader) {
-                System.out.println(c.getName());
-                System.out.println("xxxx");
                 return true;
             }
             // ignore generate byte buddy helper class

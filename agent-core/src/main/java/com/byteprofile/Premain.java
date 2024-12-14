@@ -1,118 +1,107 @@
 package com.byteprofile;
 
+
+import com.byteprofile.tools.BytecodrClassLoader;
+import com.byteprofile.tools.FlamegraphWritter;
+import com.byteprofile.tools.JFRStreamer;
+import com.byteprofile.tools.Store;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator;
+import io.opentelemetry.api.metrics.Meter;
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+import io.opentelemetry.context.propagation.ContextPropagators;
+import io.opentelemetry.context.propagation.TextMapPropagator;
+import io.opentelemetry.exporter.otlp.logs.OtlpGrpcLogRecordExporter;
+import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.sdk.logs.SdkLoggerProvider;
+import io.opentelemetry.sdk.logs.export.BatchLogRecordProcessor;
+import io.opentelemetry.sdk.metrics.SdkMeterProvider;
+import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.semconv.ResourceAttributes;
+import jdk.jfr.consumer.RecordedEvent;
+import jdk.jfr.consumer.RecordingStream;
 import net.bytebuddy.agent.builder.AgentBuilder;
-import net.bytebuddy.dynamic.loading.MultipleParentClassLoader;
+import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.matcher.ElementMatchers;
-import net.bytebuddy.matcher.StringMatcher;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Constructor;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.Executors;
+import java.time.Duration;
 import java.util.jar.JarFile;
 
-import static net.bytebuddy.agent.builder.AgentBuilder.RedefinitionStrategy.RETRANSFORMATION;
-import static net.bytebuddy.matcher.ElementMatchers.is;
-import static net.bytebuddy.matcher.ElementMatchers.named;
+import static net.bytebuddy.matcher.ElementMatchers.*;
 
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+
+import io.opentelemetry.sdk.resources.Resource;
 
 public class Premain {
 
-    public  static void premain(String agentArgs, Instrumentation inst) throws URISyntaxException, IOException, InterruptedException {
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        injectBootstrapClasses(inst, classLoader);
+    public static void premain(String agentArgs, Instrumentation inst) throws URISyntaxException, IOException, InterruptedException {
+        buildOtel();
+        JFRStreamer.stream(1);
+        FlamegraphWritter.write(5);
+
+        new AgentBuilder.Default()
+                .with(AgentBuilder.InstallationListener.StreamWriting.toSystemError())
+                .ignore(none())
+                .with(AgentBuilder.Listener.StreamWriting.toSystemError().withTransformationsOnly())
+                .disableClassFormatChanges()
+                .with(AgentBuilder.RedefinitionStrategy.REDEFINITION)
+                .type(named("io.vertx.core.http.impl.HttpServerImpl"))
+                .transform(new AgentBuilder.Transformer.ForAdvice()
+                        .advice(ElementMatchers.named("requestHandler")
+                                .and(takesArgument(0, named("io.vertx.core.Handler")
+                                        )
+                                ), "com.byteprofile.HandlerVisitorCallSite")
+                )
+                .installOn(inst);
     }
 
-    private  static void injectBootstrapClasses(Instrumentation instrumentation, ClassLoader classLoadert) throws IOException {
-        ClassLoader classLoader = ClassLoader.getSystemClassLoader();
-        ClassLoader parent = ClassLoader.getSystemClassLoader().getParent();
 
-        URL url = classLoader.getResource(Premain.class.getName().replace('.', '/') + ".class");
+    private static void buildOtel() throws InterruptedException {
+        Resource resource = Resource.getDefault().toBuilder().put(ResourceAttributes.SERVICE_NAME, "APM4me")
+                .put(ResourceAttributes.SERVICE_VERSION, "0.1.1")
+                .build();
+        ;
+        SdkTracerProvider sdkTracerProvider = SdkTracerProvider.builder()
+                .addSpanProcessor(SimpleSpanProcessor.create(OtlpGrpcSpanExporter.builder().build()))
+                .setResource(resource)
+                .build();
 
-        String resourcePath = null;
-        try {
-            resourcePath = url.toURI().getSchemeSpecificPart();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-        int protocolSeparatorIndex = resourcePath.indexOf(":");
-        int resourceSeparatorIndex = resourcePath.indexOf("!/");
+        SdkMeterProvider sdkMeterProvider =
+                SdkMeterProvider.builder()
+                        .setResource(resource)
+                        .registerMetricReader(
+                                PeriodicMetricReader.builder(OtlpGrpcMetricExporter.getDefault())
+                                        .setInterval(Duration.ofMillis(100))
+                                        .build())
+                        .build();
 
-        String agentPath = resourcePath.substring(protocolSeparatorIndex + 1, resourceSeparatorIndex);
-        File javaagentFile = new File(agentPath);
+        SdkLoggerProvider loggerProvider = SdkLoggerProvider.builder()
+                .addLogRecordProcessor(
+                        BatchLogRecordProcessor.builder(
+                                        OtlpGrpcLogRecordExporter.builder()
+                                                .setEndpoint("http://0.0.0.0:4317")
+                                                .build())
+                                .build())
+                .build();
 
-        //System.out.println("Loading bootstrap agent jar : " + agentPath + '\n');
-        //JarFile currentAgentJar = new JarFile(javaagentFile, false);
-
-        JarFile currentAgentJar = new JarFile(javaagentFile, false);
-        instrumentation.appendToBootstrapClassLoaderSearch(currentAgentJar);
-
-        String agentPathVertx = "/Users/sebastienallemand/Documents/bytecodr-for-vertx/vert-x-instrumentation/target/vertx-instr-shaded.jar";
-        File javaagentFileVertx = new File(agentPathVertx);
-        JarFile agentJarvertx = new JarFile(javaagentFileVertx, false);
-     // instrumentation.appendToBootstrapClassLoaderSearch(agentJarvertx);
-
-        String agentPathVertx2 = "/Users/sebastienallemand/Documents/bytecodr-for-vertx/vert-x-instrumentation/target/vert-x-instrumentation-1.0-SNAPSHOT.jar";
-        File javaagentFileVertx2 = new File(agentPathVertx2);
-        JarFile agentJarvertx2 = new JarFile(javaagentFileVertx2, false);
-       instrumentation.appendToBootstrapClassLoaderSearch(agentJarvertx2);
-
-        String agentPathbbuddy = "/Users/sebastienallemand/Documents/bytecodr-for-vertx/bootstrap-bytebuddy/target/bytebuddy-shaded.jar";
-        File javaagentFilebbudy = new File(agentPathbbuddy);
-        JarFile javaagentjar = new JarFile(javaagentFilebbudy, false);
-  //      instrumentation.appendToBootstrapClassLoaderSearch(javaagentjar);
-
-
-        BytecodrClassLoader classLoader1 = new BytecodrClassLoader(new URL[]{
-                javaagentFileVertx.toURL(),
-                javaagentFileVertx2.toURL(),
-                javaagentFilebbudy.toURL(),
-        }, parent);
-
-
-
-
-        try {
-            Class t = classLoader1.loadClass("com.byteprofile.InstrumentFactory");
-            Constructor con = t.getConstructor(ClassLoader.class, ClassLoader.class, Instrumentation.class);
-            Object basicMain = con.newInstance(classLoader1, parent, instrumentation);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-    }
-
-    private static ClassLoader getClassloaderOfClass(Instrumentation instrumentation, String className) {
-        try {
-            Class[] classes = instrumentation.getAllLoadedClasses();
-
-            System.out.println("Check : " + classes.length);
-
-            for (Class c : classes) {
-                try {
-                    // starts is okay for some internal classes like org.apache.kafka.Kafka.$Abc
-                    if (c.getCanonicalName().startsWith(className)) {
-                        ClassLoader cl = c.getClassLoader();
-                        System.out.print(String.format("Found the class %s is loaded by %s \n", className, cl));
-                        return cl;
-                    }
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                }
-            }
-            return null;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+        OpenTelemetrySdk.builder()
+                .setMeterProvider(sdkMeterProvider)
+                .setTracerProvider(sdkTracerProvider)
+                .setLoggerProvider(loggerProvider)
+                .setPropagators(ContextPropagators.create(TextMapPropagator
+                        .composite(W3CTraceContextPropagator.getInstance(), W3CBaggagePropagator.getInstance())))
+                .buildAndRegisterGlobal();
+        Thread.sleep(150);
     }
 
 

@@ -1,12 +1,15 @@
 package com.byteprofile;
+
+import io.opentelemetry.context.Context;
 import io.vertx.core.Handler;
 import io.vertx.core.http.HttpServerRequest;
+import io.vertx.ext.web.impl.RoutingContextImpl;
 import net.bytebuddy.asm.Advice;
 
 public class HandlerVisitorCallSite {
     @Advice.OnMethodEnter
     public static void onEnter(
-            @Advice.Argument(value = 0, readOnly = false) Handler<HttpServerRequest> handler) {
+            @Advice.Argument(value = 0, readOnly = false) Handler<RoutingContextImpl> handler) {
         handler = HandlerWrapper.wrap(handler);
     }
 }

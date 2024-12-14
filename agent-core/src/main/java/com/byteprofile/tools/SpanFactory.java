@@ -18,10 +18,12 @@ public class SpanFactory {
                         .map(entry -> entry.getKey() + ": " + entry.getValue())
                         .collect(Collectors.joining(" ")));
 
-        if (Span.fromContext(extractedContext).getClass().getName().equals("io.opentelemetry.sdk.trace.SdkSpan"))
+        Span s = Span.fromContext(extractedContext);
+        if (s.getClass().getName().equals("io.opentelemetry.sdk.trace.SdkSpan")) {
+            System.out.println(extractedContext);
             span.setNoParent();
-        else
-            span.setParent(extractedContext);
+        } else
+            span.setParent(Context.current().with(s));
 
         return span;
     }

@@ -46,7 +46,7 @@ public class Premain {
 
     public static void premain(String agentArgs, Instrumentation inst) throws URISyntaxException, IOException, InterruptedException {
         buildOtel();
-        //    JFRStreamer.stream(1);
+          JFRStreamer.stream(1);
         //  FlamegraphWritter.write(5);
 
         new AgentBuilder.Default()

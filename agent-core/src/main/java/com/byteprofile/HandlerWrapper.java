@@ -14,14 +14,7 @@ import io.opentelemetry.context.Scope;
 import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.context.propagation.TextMapPropagator;
 import io.vertx.core.Handler;
-import io.vertx.core.http.HttpServerRequest;
 import io.vertx.ext.web.impl.RoutingContextImpl;
-
-import java.lang.instrument.Instrumentation;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 
 /**
  * This is used to wrap Vert.x Handlers to provide nice user-friendly SERVER span names
@@ -38,16 +31,9 @@ public final class HandlerWrapper implements Handler<RoutingContextImpl> {
 
 
     public static Handler<RoutingContextImpl> wrap(Handler<RoutingContextImpl> handler) {
-        Context current = Context.current();
         if (handler != null && !(handler instanceof RoutingContextImpl)) {
-            if (current == Context.root()) {
-                Tracer tracer = GlobalOpenTelemetry.getTracer("APM-Vert.x");
-                Span span = tracer.spanBuilder("vertx.handleRequest.root").startSpan();
-                Context contextRoot = Context.root().with(span);
-                handler = new HandlerWrapper(handler, contextRoot);
-            } else {
-                handler = new HandlerWrapper(handler, current);
-            }
+            Context current = Context.current();
+            handler = new HandlerWrapper(handler, current);
         }
         return handler;
     }

@@ -1,8 +1,6 @@
 package com.byteprofile;
 
-import io.opentelemetry.context.Context;
 import io.vertx.core.Handler;
-import io.vertx.core.http.HttpServerRequest;
 import io.vertx.ext.web.impl.RoutingContextImpl;
 import net.bytebuddy.asm.Advice;
 

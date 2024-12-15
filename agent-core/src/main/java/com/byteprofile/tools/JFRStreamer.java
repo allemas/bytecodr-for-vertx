@@ -29,14 +29,18 @@ public class JFRStreamer {
         scheduler.scheduleAtFixedRate(task(), 0, period, TimeUnit.SECONDS);
     }
 
-    private record JFR(String name, Duration period) {
+    private record JFR(String name, Duration period, String key) {
     }
 
     private static Runnable task() {
         JFR[] listenedJFR = new JFR[]{
-                new JFR("jdk.CPULoad", Duration.ofSeconds(2)),
-                new JFR("jdk.GCHeapSummary", Duration.ofSeconds(2)),
-                new JFR("jdk.GCHeapMemoryUsage", Duration.ofSeconds(2))
+                new JFR("jdk.CPULoad", Duration.ofSeconds(2), "machineTotal"),
+                new JFR("jdk.GCHeapSummary", Duration.ofSeconds(2), "heapUsed"),
+                new JFR("jdk.MetaspaceSummary", Duration.ofSeconds(2), "gcThreshold"),
+                new JFR("jdk.MetaspaceAllocationFailure", Duration.ofSeconds(2), "size"),
+                new JFR("jdk.ResidentSetSize", Duration.ofSeconds(2), "size"),
+                new JFR("jdk.GCHeapMemoryUsage", Duration.ofSeconds(2), "used"),
+                new JFR("jdk.GCHeapMemoryPoolUsage", Duration.ofSeconds(2), "used")
         };
 
         return (() -> {
@@ -45,7 +49,20 @@ public class JFRStreamer {
                         .forEach(jfr -> {
                             rs.enable(jfr.name).withPeriod(jfr.period);
                             rs.onEvent(jfr.name, System.out::println);
+                            rs.onEvent(jfr.name, recordedEvent ->
+                            {
+                                String eventName = recordedEvent.getEventType().getName();
+                                final Meter meter = GlobalOpenTelemetry.getMeter(eventName);
+
+                                if (recordedEvent.hasField(jfr.key)) {
+                                    double value = recordedEvent.getDouble(jfr.key);
+                                    meter.gaugeBuilder(eventName)
+                                            .build()
+                                            .set(value);
+                                }
+                            });
                         });
+
 
                 rs.onEvent("jdk.GCHeapMemoryUsage", recordedEvent -> {
                     final Meter meter = GlobalOpenTelemetry.getMeter("GCHeapMemoryUsage");
@@ -55,6 +72,17 @@ public class JFRStreamer {
                             .build()
                             .set(recordedEvent.getDouble("used"));
                 });
+
+                rs.onEvent("jdk.GCHeapMemoryPoolUsage", recordedEvent -> {
+                    final Meter meter = GlobalOpenTelemetry.getMeter("GCHeapMemoryUsage");
+                    meter.gaugeBuilder("gc_heap_used")
+                            .setDescription("Charge totale de la machine")
+                            .setUnit("MB")
+                            .build()
+                            .set(recordedEvent.getDouble("used"));
+                });
+
+
                 rs.start();
             } catch (Exception e) {
                 e.printStackTrace();

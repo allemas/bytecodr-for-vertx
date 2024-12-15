@@ -46,23 +46,21 @@ public class Premain {
 
     public static void premain(String agentArgs, Instrumentation inst) throws URISyntaxException, IOException, InterruptedException {
         buildOtel();
-          JFRStreamer.stream(1);
+        //  JFRStreamer.stream(1);
         //  FlamegraphWritter.write(5);
 
         new AgentBuilder.Default()
                 .with(AgentBuilder.InstallationListener.StreamWriting.toSystemError())
-                .ignore(none())
                 .with(AgentBuilder.Listener.StreamWriting.toSystemError().withTransformationsOnly())
-                .disableClassFormatChanges()
                 .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
                 .type(named("io.vertx.ext.web.impl.RouteImpl"))
                 .transform(new AgentBuilder.Transformer.ForAdvice()
-                        .advice(ElementMatchers.named("handler")
+                        .advice(named("handler")
                                 .and(takesArgument(0, named("io.vertx.core.Handler")
-                                        )
-                                ), "com.byteprofile.HandlerVisitorCallSite")
+                                )), "com.byteprofile.HandlerTransformerCallSite")
                 )
                 .installOn(inst);
+
     }
 
 
